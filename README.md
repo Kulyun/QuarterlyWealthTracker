@@ -1,11 +1,45 @@
-<div align="center">
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+# 季度资产追踪器 (Quarterly Wealth Tracker) 📱💰
 
-  <h1>Built with AI Studio</h2>
+这是一个专为个人设计的资产配置追踪工具，支持季度数据记录、自动可视化分析以及 AI 财务建议。
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🌟 主要功能
+- **季度记账**：按类别（房产、现金、股票、比特币等）记录资产明细。
+- **自动计算**：自动汇总总资产、可支配资产及大盘指数占比。
+- **双维度看板**：
+  - **总资产分布**：包含房产在内的全额资产占比。
+  - **可支配资产分布**：流动性资产的精细化分布图。
+- **AI 财务顾问**：基于 Google Gemini API 提供专业的季度资产配置建议。
+- **PWA 支持**：可作为独立 App 安装至手机桌面。
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## 🚀 部署指南
 
-</div>
+### 方案 A：快速部署到 Vercel (推荐)
+1. 将代码推送至你的 GitHub 私有仓库。
+2. 登录 [Vercel](https://vercel.com/)。
+3. 点击 "Add New" -> "Project"，导入你的仓库。
+4. 在 **Environment Variables** 设置中添加：
+   - `API_KEY`: 你的 Google Gemini API Key。
+5. 点击 "Deploy"，完成后即可获得一个可访问的网址。
+
+### 方案 B：GitHub Pages (静态部署)
+1. 创建 GitHub 仓库并上传文件。
+2. 在 `Settings` > `Pages` 中开启部署。
+3. **注意**：由于静态托管限制，你可能需要手动在 `services/geminiService.ts` 中处理 API Key。
+
+## 📲 如何安装到手机？
+
+### iOS (iPhone)
+1. 在 **Safari** 浏览器中打开部署好的网址。
+2. 点击底部的 **“分享”** 按钮（正方形带向上箭头）。
+3. 向上滑动菜单，选择 **“添加到主屏幕”**。
+4. 点击右上角的 “添加”，App 图标就会出现在你的桌面上。
+
+### Android
+1. 在 **Chrome** 浏览器中打开网址。
+2. 点击右上角的 **三个点** 菜单。
+3. 选择 **“安装应用”** 或 **“添加到主屏幕”**。
+
+## 🔒 数据隐私
+- **本地存储**：所有资产明细均存储在您浏览器的 `localStorage` 中，不会上传到任何第三方服务器。
+- **AI 分析**：仅在点击“AI 理财建议”时，会将汇总后的脱敏数值发送给 Gemini API 进行分析。
