@@ -18,7 +18,10 @@ import {
   AlertTriangle,
   History,
   RefreshCw,
-  Cpu
+  Cpu,
+  FileText,
+  ChevronDown,
+  Calendar
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -28,7 +31,7 @@ import { calculateQuarterMetrics, formatCurrency, sumEntries } from './utils/cal
 import { getFinancialAdvice } from './services/geminiService';
 
 // App Version/Build Info
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const BUILD_DATE = new Date().toLocaleDateString();
 
 // Initialize Empty Data
@@ -79,6 +82,10 @@ const App: React.FC = () => {
             <PlusCircle size={22} />
             <span className="text-[10px] font-medium">记账</span>
           </Link>
+          <Link to="/manage" className="p-2 text-slate-500 hover:text-indigo-600 flex flex-col items-center gap-1">
+            <FileText size={22} />
+            <span className="text-[10px] font-medium">详情</span>
+          </Link>
           <Link to="/trends" className="p-2 text-slate-500 hover:text-indigo-600 flex flex-col items-center gap-1">
             <TrendingUp size={22} />
             <span className="text-[10px] font-medium">趋势</span>
@@ -96,10 +103,11 @@ const App: React.FC = () => {
           <nav className="flex-1 p-4 space-y-2">
             <NavItem to="/" icon={<LayoutDashboard size={20} />} label="仪表盘" />
             <NavItem to="/add" icon={<PlusCircle size={20} />} label="记录资产" />
+            <NavItem to="/manage" icon={<FileText size={20} />} label="记录详情" />
             <NavItem to="/trends" icon={<TrendingUp size={20} />} label="趋势分析" />
           </nav>
           <div className="p-4 border-t border-slate-100">
-             <p className="text-[10px] text-slate-400 font-medium">VERSION {APP_VERSION}</p>
+             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Version {APP_VERSION}</p>
           </div>
         </aside>
 
@@ -108,6 +116,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Dashboard records={records} />} />
             <Route path="/add" element={<AddRecord records={records} setRecords={setRecords} />} />
+            <Route path="/manage" element={<ManageRecords records={records} setRecords={setRecords} />} />
             <Route path="/trends" element={<Trends records={records} setRecords={setRecords} />} />
           </Routes>
         </main>
@@ -129,19 +138,26 @@ const NavItem: React.FC<{ to: string, icon: React.ReactNode, label: string }> = 
 
 /* --- Dashboard Component --- */
 const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
-  const latestRecord = records[records.length - 1];
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    return records.length > 0 ? records[records.length - 1].id : '';
+  });
+
+  const currentRecord = useMemo(() => {
+    return records.find(r => r.id === selectedId) || records[records.length - 1];
+  }, [records, selectedId]);
+
   const [advice, setAdvice] = useState<string | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
 
   const { metrics, totalAssetsChartData, disposableAssetsChartData } = useMemo(() => {
-    if (!latestRecord) return { groups: [], metrics: { totalAssets: 0, disposableAssets: 0, totalMarketIndex: 0 }, totalAssetsChartData: [], disposableAssetsChartData: [] };
-    return calculateQuarterMetrics(latestRecord);
-  }, [latestRecord]);
+    if (!currentRecord) return { groups: [], metrics: { totalAssets: 0, disposableAssets: 0, totalMarketIndex: 0 }, totalAssetsChartData: [], disposableAssetsChartData: [] };
+    return calculateQuarterMetrics(currentRecord);
+  }, [currentRecord]);
 
   const handleGetAdvice = async () => {
-    if (!latestRecord) return;
+    if (!currentRecord) return;
     setLoadingAdvice(true);
-    const result = await getFinancialAdvice(latestRecord, metrics);
+    const result = await getFinancialAdvice(currentRecord, metrics);
     setAdvice(result);
     setLoadingAdvice(false);
   };
@@ -150,7 +166,7 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
     return `${name} ${(percent * 100).toFixed(0)}%`;
   };
 
-  if (!latestRecord) {
+  if (records.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
         <div className="bg-slate-100 p-6 rounded-full mb-6">
@@ -167,11 +183,30 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
-      <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">{latestRecord.id} 报告</span>
-          <h1 className="text-3xl font-bold mt-1">财务总览</h1>
+      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div>
+            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">财务报告</span>
+            <h1 className="text-3xl font-bold mt-1">财务总览</h1>
+          </div>
+          
+          <div className="relative group min-w-[140px]">
+            <select 
+              value={selectedId}
+              onChange={(e) => {
+                setSelectedId(e.target.value);
+                setAdvice(null); // Reset advice when changing quarter
+              }}
+              className="appearance-none bg-white border border-slate-200 px-4 py-2 pr-10 rounded-xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-100 focus:outline-none shadow-sm cursor-pointer"
+            >
+              {[...records].reverse().map(r => (
+                <option key={r.id} value={r.id}>{r.id}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </div>
+        
         <button 
           onClick={handleGetAdvice}
           disabled={loadingAdvice}
@@ -252,7 +287,7 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
           <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 animate-in slide-in-from-bottom duration-500">
             <div className="flex items-center gap-2 mb-3 text-indigo-700">
               <Sparkles size={18} />
-              <h3 className="font-bold">理财建议</h3>
+              <h3 className="font-bold">理财建议 ({selectedId})</h3>
             </div>
             <div className="prose prose-sm text-indigo-900 leading-relaxed whitespace-pre-wrap">
               {advice}
@@ -283,12 +318,26 @@ const MetricCard: React.FC<{ label: string, value: number, icon: React.ReactNode
 /* --- AddRecord Component --- */
 const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<React.SetStateAction<WealthRecord[]>> }> = ({ records, setRecords }) => {
   const [quarterId, setQuarterId] = useState(() => {
+    const lastUsed = localStorage.getItem('wealth_tracker_last_quarter');
+    if (lastUsed) return lastUsed;
     const d = new Date();
     const q = Math.floor(d.getMonth() / 3) + 1;
     return `${d.getFullYear()}-Q${q}`;
   });
+
   const [data, setData] = useState<QuarterData>(createEmptyQuarterData());
   const [activeTab, setActiveTab] = useState<CategoryId>(CategoryId.CASH_NO_INTEREST);
+
+  // Sync with existing record if available when quarterId changes
+  useEffect(() => {
+    localStorage.setItem('wealth_tracker_last_quarter', quarterId);
+    const existing = records.find(r => r.id === quarterId);
+    if (existing) {
+      setData(JSON.parse(JSON.stringify(existing.data))); // Deep copy
+    } else {
+      setData(createEmptyQuarterData());
+    }
+  }, [quarterId, records]);
 
   const handleAddEntry = (catId: CategoryId) => {
     setData(prev => ({
@@ -321,7 +370,7 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
       const filtered = prev.filter(r => r.id !== quarterId);
       return [...filtered, newRecord].sort((a, b) => a.timestamp - b.timestamp);
     });
-    alert('记录已保存！');
+    alert(`季度 ${quarterId} 记录已保存！`);
   };
 
   const groupTotals = useMemo(() => {
@@ -332,22 +381,31 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
     return catTotals;
   }, [data]);
 
+  const hasExistingData = records.some(r => r.id === quarterId);
+
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto pb-40">
       <header className="mb-6 flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-bold">季度资产登记</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            季度资产登记
+            {hasExistingData && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">编辑模式</span>}
+          </h1>
           <p className="text-sm text-slate-500">记录本季度各项资产分项</p>
         </div>
         <div className="flex items-center gap-3">
-          <input 
-            type="text" 
-            value={quarterId} 
-            onChange={e => setQuarterId(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-center font-bold"
-          />
+          <div className="relative flex-1">
+             <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+             <input 
+              type="text" 
+              value={quarterId} 
+              onChange={e => setQuarterId(e.target.value.toUpperCase())}
+              placeholder="例如: 2025-Q2"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold text-slate-700"
+            />
+          </div>
           <button onClick={handleSave} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-transform">
-            保存
+            保存记录
           </button>
         </div>
       </header>
@@ -358,7 +416,7 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
             <button
               key={id}
               onClick={() => setActiveTab(id as CategoryId)}
-              className={`flex-shrink-0 md:w-full text-left px-4 py-3 rounded-2xl flex flex-col transition-all border ${activeTab === id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-100'}`}
+              className={`flex-shrink-0 md:w-full text-left px-4 py-3 rounded-2xl flex flex-col transition-all border ${activeTab === id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-200'}`}
             >
               <span className={`text-[10px] font-bold uppercase ${activeTab === id ? 'text-indigo-200' : 'text-slate-400'}`}>{meta.group}</span>
               <span className="font-semibold whitespace-nowrap">{meta.label}</span>
@@ -374,12 +432,12 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
 
           <div className="space-y-4">
             {data[activeTab].map((entry) => (
-              <div key={entry.id} className="flex gap-2 items-center">
+              <div key={entry.id} className="flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200">
                 <input
                   type="text"
                   value={entry.label}
                   onChange={e => updateEntry(activeTab, entry.id, 'label', e.target.value)}
-                  placeholder="项目名称"
+                  placeholder="项目名称 (如: 招行工资卡)"
                   className="flex-1 px-4 py-3 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-indigo-100 focus:outline-none bg-slate-50 text-sm"
                 />
                 <div className="relative w-32">
@@ -392,7 +450,7 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
                     className="w-full px-4 py-3 pl-7 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-indigo-100 focus:outline-none bg-slate-50 font-bold text-sm"
                   />
                 </div>
-                <button onClick={() => deleteEntry(activeTab, entry.id)} className="p-2 text-slate-300 active:text-red-500">
+                <button onClick={() => deleteEntry(activeTab, entry.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
                   <Trash2 size={18} />
                 </button>
               </div>
@@ -400,7 +458,7 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
             
             <button 
               onClick={() => handleAddEntry(activeTab)}
-              className="w-full border-2 border-dashed border-slate-100 py-4 rounded-2xl text-slate-400 font-semibold flex items-center justify-center gap-2 active:bg-slate-50"
+              className="w-full border-2 border-dashed border-slate-100 py-4 rounded-2xl text-slate-400 font-semibold flex items-center justify-center gap-2 hover:border-indigo-200 hover:text-indigo-500 transition-all active:bg-slate-50"
             >
               <Plus size={18} />
               添加分项
@@ -408,6 +466,103 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+/* --- ManageRecords Component --- */
+const ManageRecords: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<React.SetStateAction<WealthRecord[]>> }> = ({ records, setRecords }) => {
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    return records.length > 0 ? records[records.length - 1].id : '';
+  });
+
+  const record = useMemo(() => {
+    return records.find(r => r.id === selectedId);
+  }, [records, selectedId]);
+
+  const handleDeleteRecord = (id: string) => {
+    if (window.confirm(`确定要永久删除 ${id} 的所有资产数据吗？该操作不可撤销。`)) {
+      const updated = records.filter(r => r.id !== id);
+      setRecords(updated);
+      if (selectedId === id && updated.length > 0) {
+        setSelectedId(updated[updated.length - 1].id);
+      } else if (updated.length === 0) {
+        setSelectedId('');
+      }
+    }
+  };
+
+  if (records.length === 0) {
+    return (
+      <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center min-h-[60vh]">
+         <div className="bg-slate-100 p-6 rounded-full mb-4"><FileText size={40} className="text-slate-400" /></div>
+         <p>暂无记录。请先添加资产数据。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8 max-w-5xl mx-auto pb-40">
+      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">记录详情</h1>
+          <p className="text-slate-500">查看与管理每一季度的详细输入</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <select 
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="appearance-none bg-white border border-slate-200 pl-4 pr-10 py-3 rounded-2xl font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+            >
+              {[...records].reverse().map(r => (
+                <option key={r.id} value={r.id}>{r.id}</option>
+              ))}
+            </select>
+            <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+
+          <button 
+            onClick={() => handleDeleteRecord(selectedId)}
+            className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors shadow-sm"
+            title="删除该季度记录"
+          >
+            <Trash2 size={20} />
+          </button>
+        </div>
+      </header>
+
+      {record && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {Object.entries(record.data).map(([catId, entries]) => {
+            if (entries.length === 0) return null;
+            const meta = CATEGORY_METADATA[catId as CategoryId];
+            const total = sumEntries(entries);
+            
+            return (
+              <div key={catId} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-6 rounded-full" style={{ backgroundColor: meta.color }}></div>
+                    <span className="font-bold text-slate-800">{meta.label}</span>
+                    <span className="text-[10px] bg-white px-2 py-0.5 rounded-full text-slate-400 uppercase border border-slate-100">{meta.group}</span>
+                  </div>
+                  <span className="font-black text-indigo-600">{formatCurrency(total)}</span>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {entries.map((entry) => (
+                    <div key={entry.id} className="px-6 py-3 flex justify-between items-center hover:bg-slate-50/50 transition-colors">
+                      <span className="text-sm font-medium text-slate-600">{entry.label || '(未命名分项)'}</span>
+                      <span className="text-sm font-bold text-slate-700">{formatCurrency(entry.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -477,34 +632,41 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-40">
       <header className="mb-8">
         <h1 className="text-3xl font-bold">趋势分析</h1>
-        <p className="text-slate-500">资产季度增长变化</p>
+        <p className="text-slate-500">资产季度增长变化图</p>
       </header>
 
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 mb-8">
-        <h3 className="text-lg font-bold mb-6">资产增长曲线</h3>
-        <div className="h-80 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-              <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `${(val / 10000).toFixed(0)}w`} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-              <Tooltip formatter={(value: number) => formatCurrency(value)} />
-              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-              <Line type="monotone" dataKey="总资产" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="可支配" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
+      {records.length > 0 ? (
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 mb-8">
+          <h3 className="text-lg font-bold mb-6">资产增长曲线</h3>
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `${(val / 10000).toFixed(0)}w`} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                <Line type="monotone" dataKey="总资产" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="可支配" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="指数" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 mb-8">
+          需要至少 2 条记录来展示趋势
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* History List */}
+        {/* History Quick List */}
         <div className="space-y-4">
           <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
             <History size={18} />
-            历史记录
+            最近记录
           </h4>
-          {[...records].reverse().map(r => {
+          {[...records].reverse().slice(0, 5).map(r => {
             const { metrics } = calculateQuarterMetrics(r);
             return (
               <div key={r.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
@@ -514,7 +676,7 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
                   </div>
                   <div>
                     <span className="font-bold block">{r.id}</span>
-                    <span className="text-[10px] text-slate-400 uppercase tracking-tight">资产更新</span>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-tight">Snapshot</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -523,6 +685,7 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
               </div>
             );
           })}
+          {records.length > 5 && <Link to="/manage" className="block text-center text-indigo-600 text-xs font-bold py-2">查看更多记录详情</Link>}
         </div>
 
         {/* Data & App Management */}
@@ -530,13 +693,9 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
           <div className="space-y-4">
             <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
               <Settings size={18} />
-              数据管理
+              数据与安全
             </h4>
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                提示：您的数据目前仅存储在此设备本地浏览器中。
-              </p>
-              
               <button 
                 onClick={handleExport}
                 className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 transition-colors group"
@@ -545,7 +704,7 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
                   <Download size={20} className="text-indigo-500" />
                   <div className="text-left">
                     <span className="font-bold block text-sm">备份数据</span>
-                    <span className="text-[10px] text-slate-400">导出为 .json 文件</span>
+                    <span className="text-[10px] text-slate-400">导出 JSON 文件</span>
                   </div>
                 </div>
                 <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-300" />
@@ -559,25 +718,19 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
                   <Upload size={20} className="text-emerald-500" />
                   <div className="text-left">
                     <span className="font-bold block text-sm">还原数据</span>
-                    <span className="text-[10px] text-slate-400">从备份文件导入</span>
+                    <span className="text-[10px] text-slate-400">从备份导入</span>
                   </div>
                 </div>
                 <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-300" />
               </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleImport} 
-                accept=".json" 
-                className="hidden" 
-              />
+              <input type="file" ref={fileInputRef} onChange={handleImport} accept=".json" className="hidden" />
 
               <button 
                 onClick={handleClearAll}
                 className="w-full flex items-center gap-3 p-4 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
               >
                 <AlertTriangle size={20} />
-                <span className="font-bold text-sm">清空所有本地数据</span>
+                <span className="font-bold text-sm">清空本地记录</span>
               </button>
             </div>
           </div>
@@ -585,30 +738,23 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
           <div className="space-y-4">
             <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
               <Cpu size={18} />
-              系统信息
+              系统
             </h4>
             <div className="bg-slate-900 p-6 rounded-3xl text-slate-300 shadow-xl">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">Current Version</p>
-                  <p className="text-xl font-mono font-bold text-white tracking-tighter">{APP_VERSION}</p>
+                  <p className="text-slate-500 text-[10px] uppercase font-black mb-1">Version</p>
+                  <p className="text-xl font-mono font-bold text-white">{APP_VERSION}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">Build Date</p>
+                  <p className="text-slate-500 text-[10px] uppercase font-black mb-1">Built</p>
                   <p className="text-sm font-mono text-slate-400">{BUILD_DATE}</p>
                 </div>
               </div>
-
-              <button 
-                onClick={handleAppRefresh}
-                className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95"
-              >
+              <button onClick={handleAppRefresh} className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95">
                 <RefreshCw size={18} />
-                <span className="font-bold text-sm">检查应用更新</span>
+                <span className="font-bold text-sm">刷新并检查更新</span>
               </button>
-              <p className="text-[10px] text-slate-500 mt-4 text-center leading-relaxed">
-                如果您刚在 Vercel 部署了新代码，请点击上方按钮强制刷新缓存。
-              </p>
             </div>
           </div>
         </div>
