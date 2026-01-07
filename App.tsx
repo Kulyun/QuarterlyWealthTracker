@@ -21,7 +21,8 @@ import {
   Cpu,
   FileText,
   ChevronDown,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -31,7 +32,7 @@ import { calculateQuarterMetrics, formatCurrency, sumEntries } from './utils/cal
 import { getFinancialAdvice } from './services/geminiService';
 
 // App Version/Build Info
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 const BUILD_DATE = new Date().toLocaleDateString();
 
 // Initialize Empty Data
@@ -437,16 +438,16 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
                   type="text"
                   value={entry.label}
                   onChange={e => updateEntry(activeTab, entry.id, 'label', e.target.value)}
-                  placeholder="项目名称 (如: 招行工资卡)"
-                  className="flex-1 px-4 py-3 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-indigo-100 focus:outline-none bg-slate-50 text-sm"
+                  placeholder="名称"
+                  className="w-28 md:w-40 px-4 py-3 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-indigo-100 focus:outline-none bg-slate-50 text-sm"
                 />
-                <div className="relative w-32">
+                <div className="relative flex-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">¥</span>
                   <input
                     type="number"
                     value={entry.value === 0 ? '' : entry.value}
                     onChange={e => updateEntry(activeTab, entry.id, 'value', Number(e.target.value))}
-                    placeholder="金额"
+                    placeholder="请输入金额"
                     className="w-full px-4 py-3 pl-7 rounded-2xl border border-slate-100 focus:ring-2 focus:ring-indigo-100 focus:outline-none bg-slate-50 font-bold text-sm"
                   />
                 </div>
@@ -489,6 +490,23 @@ const ManageRecords: React.FC<{ records: WealthRecord[], setRecords: React.Dispa
       } else if (updated.length === 0) {
         setSelectedId('');
       }
+    }
+  };
+
+  const handleDeleteEntry = (catId: string, entryId: string) => {
+    if (window.confirm('确定要删除这个细项吗？')) {
+      setRecords(prev => prev.map(r => {
+        if (r.id === selectedId) {
+          return {
+            ...r,
+            data: {
+              ...r.data,
+              [catId]: r.data[catId as CategoryId].filter(e => e.id !== entryId)
+            }
+          };
+        }
+        return r;
+      }));
     }
   };
 
@@ -552,9 +570,17 @@ const ManageRecords: React.FC<{ records: WealthRecord[], setRecords: React.Dispa
                 </div>
                 <div className="divide-y divide-slate-50">
                   {entries.map((entry) => (
-                    <div key={entry.id} className="px-6 py-3 flex justify-between items-center hover:bg-slate-50/50 transition-colors">
+                    <div key={entry.id} className="px-6 py-3 flex justify-between items-center hover:bg-slate-50/50 transition-colors group">
                       <span className="text-sm font-medium text-slate-600">{entry.label || '(未命名分项)'}</span>
-                      <span className="text-sm font-bold text-slate-700">{formatCurrency(entry.value)}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-slate-700">{formatCurrency(entry.value)}</span>
+                        <button 
+                          onClick={() => handleDeleteEntry(catId, entry.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
