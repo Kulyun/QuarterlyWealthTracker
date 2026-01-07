@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -12,7 +12,11 @@ import {
   Plus, 
   Info,
   Sparkles,
-  ArrowUpRight
+  ArrowUpRight,
+  Download,
+  Upload,
+  AlertTriangle,
+  History
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -59,7 +63,7 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-900">
-        {/* Mobile Navigation - Optimized for safe area */}
+        {/* Mobile Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 flex justify-around p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] z-50">
           <Link to="/" className="p-2 text-slate-500 hover:text-indigo-600 flex flex-col items-center gap-1">
             <LayoutDashboard size={22} />
@@ -95,7 +99,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Dashboard records={records} />} />
             <Route path="/add" element={<AddRecord records={records} setRecords={setRecords} />} />
-            <Route path="/trends" element={<Trends records={records} />} />
+            <Route path="/trends" element={<Trends records={records} setRecords={setRecords} />} />
           </Routes>
         </main>
       </div>
@@ -177,7 +181,6 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Chart 1: Total Assets Distribution */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-lg">总资产分布</h3>
@@ -206,7 +209,6 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
           </div>
         </div>
 
-        {/* Chart 2: Disposable Assets Distribution */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-lg">可支配资产分布</h3>
@@ -342,7 +344,6 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Category Selector - Horizontal Scroll on Mobile */}
         <div className="md:col-span-1 flex md:flex-col overflow-x-auto gap-2 pb-2 md:pb-0 scrollbar-hide">
           {Object.entries(CATEGORY_METADATA).map(([id, meta]) => (
             <button
@@ -356,7 +357,6 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
           ))}
         </div>
 
-        {/* Input Area */}
         <div className="md:col-span-3 bg-white p-5 md:p-8 rounded-3xl shadow-sm border border-slate-100 min-h-[400px]">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-slate-800">{CATEGORY_METADATA[activeTab].label}</h3>
@@ -404,7 +404,9 @@ const AddRecord: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<
 };
 
 /* --- Trends Component --- */
-const Trends: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
+const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<React.SetStateAction<WealthRecord[]>> }> = ({ records, setRecords }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const trendData = useMemo(() => {
     return records.map(r => {
       const { metrics } = calculateQuarterMetrics(r);
@@ -417,14 +419,53 @@ const Trends: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
     });
   }, [records]);
 
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wealth-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (Array.isArray(json) && window.confirm('导入数据将覆盖当前所有记录，确定吗？')) {
+          setRecords(json);
+          alert('导入成功！');
+        }
+      } catch (err) {
+        alert('无效的 JSON 文件');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm('警告：此操作将永久删除所有本地资产记录，无法撤销！建议先导出备份。确定要清空吗？')) {
+      setRecords([]);
+      localStorage.removeItem('wealth_tracker_records');
+    }
+  };
+
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto pb-40">
       <header className="mb-8">
         <h1 className="text-3xl font-bold">趋势分析</h1>
         <p className="text-slate-500">资产季度增长变化</p>
       </header>
 
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 mb-6">
+      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 mb-8">
         <h3 className="text-lg font-bold mb-6">资产增长曲线</h3>
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -441,28 +482,89 @@ const Trends: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h4 className="font-bold px-1">历史季度</h4>
-        {[...records].reverse().map(r => {
-          const { metrics } = calculateQuarterMetrics(r);
-          return (
-            <div key={r.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* History List */}
+        <div className="space-y-4">
+          <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
+            <History size={18} />
+            历史记录
+          </h4>
+          {[...records].reverse().map(r => {
+            const { metrics } = calculateQuarterMetrics(r);
+            return (
+              <div key={r.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                    {r.id.split('-')[1]}
+                  </div>
+                  <div>
+                    <span className="font-bold block">{r.id}</span>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-tight">资产更新</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="block font-bold text-sm">{formatCurrency(metrics.totalAssets)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Data Management Section */}
+        <div className="space-y-4">
+          <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
+            <Settings size={18} />
+            数据管理
+          </h4>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              提示：您的数据目前仅存储在此设备本地浏览器中。建议定期导出备份。
+            </p>
+            
+            <button 
+              onClick={handleExport}
+              className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 transition-colors group"
+            >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                  {r.id.split('-')[1]}
-                </div>
-                <div>
-                  <span className="font-bold block">{r.id}</span>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-tight">资产更新记录</span>
+                <Download size={20} className="text-indigo-500" />
+                <div className="text-left">
+                  <span className="font-bold block text-sm">备份数据</span>
+                  <span className="text-[10px] text-slate-400">导出为 .json 文件</span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="block font-bold text-sm">{formatCurrency(metrics.totalAssets)}</span>
-                <span className="text-[10px] text-emerald-500 font-medium">季度记录</span>
+              <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-300" />
+            </button>
+
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <Upload size={20} className="text-emerald-500" />
+                <div className="text-left">
+                  <span className="font-bold block text-sm">还原数据</span>
+                  <span className="text-[10px] text-slate-400">从备份文件导入</span>
+                </div>
               </div>
-            </div>
-          );
-        })}
+              <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-300" />
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImport} 
+              accept=".json" 
+              className="hidden" 
+            />
+
+            <button 
+              onClick={handleClearAll}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+            >
+              <AlertTriangle size={20} />
+              <span className="font-bold text-sm">清空所有本地数据</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
