@@ -32,7 +32,7 @@ import { calculateQuarterMetrics, formatCurrency, sumEntries } from './utils/cal
 import { getFinancialAdvice } from './services/geminiService';
 
 // App Version/Build Info
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.2.2";
 const BUILD_DATE = new Date().toLocaleDateString();
 
 // Initialize Empty Data
@@ -163,8 +163,27 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
     setLoadingAdvice(false);
   };
 
-  const renderLabel = ({ name, percent }: any) => {
-    return `${name} ${(percent * 100).toFixed(0)}%`;
+  // 优化后的响应式双行标签
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 25; // 增加间距
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const isMobile = window.innerWidth < 768;
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#475569"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        style={{ fontSize: isMobile ? '10px' : '12px', fontWeight: 600 }}
+      >
+        <tspan x={x} dy="-0.6em">{name}</tspan>
+        <tspan x={x} dy="1.2em" fill="#6366f1">{(percent * 100).toFixed(0)}%</tspan>
+      </text>
+    );
   };
 
   if (records.length === 0) {
@@ -181,6 +200,8 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
       </div>
     );
   }
+
+  const isMobile = window.innerWidth < 768;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -230,25 +251,26 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-lg">总资产分布</h3>
           </div>
-          <div className="h-72 w-full">
+          <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={totalAssetsChartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
+                  innerRadius={isMobile ? 40 : 50}
+                  outerRadius={isMobile ? 65 : 80}
                   paddingAngle={5}
                   dataKey="value"
-                  label={renderLabel}
+                  label={renderCustomLabel}
+                  labelLine={false}
                 >
                   {totalAssetsChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} layout="horizontal" align="center" verticalAlign="bottom" />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -258,25 +280,26 @@ const Dashboard: React.FC<{ records: WealthRecord[] }> = ({ records }) => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-lg">可支配资产分布</h3>
           </div>
-          <div className="h-72 w-full">
+          <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={disposableAssetsChartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
+                  innerRadius={isMobile ? 40 : 50}
+                  outerRadius={isMobile ? 65 : 80}
                   paddingAngle={5}
                   dataKey="value"
-                  label={renderLabel}
+                  label={renderCustomLabel}
+                  labelLine={false}
                 >
                   {disposableAssetsChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} layout="horizontal" align="center" verticalAlign="bottom" />
               </PieChart>
             </ResponsiveContainer>
           </div>
