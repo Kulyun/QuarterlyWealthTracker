@@ -16,7 +16,9 @@ import {
   Download,
   Upload,
   AlertTriangle,
-  History
+  History,
+  RefreshCw,
+  Cpu
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -24,6 +26,10 @@ import { CategoryId, WealthRecord, Entry, QuarterData } from './types';
 import { CATEGORY_METADATA, COLORS } from './constants';
 import { calculateQuarterMetrics, formatCurrency, sumEntries } from './utils/calculations';
 import { getFinancialAdvice } from './services/geminiService';
+
+// App Version/Build Info
+const APP_VERSION = "1.1.0";
+const BUILD_DATE = new Date().toLocaleDateString();
 
 // Initialize Empty Data
 const createEmptyQuarterData = (): QuarterData => {
@@ -92,6 +98,9 @@ const App: React.FC = () => {
             <NavItem to="/add" icon={<PlusCircle size={20} />} label="记录资产" />
             <NavItem to="/trends" icon={<TrendingUp size={20} />} label="趋势分析" />
           </nav>
+          <div className="p-4 border-t border-slate-100">
+             <p className="text-[10px] text-slate-400 font-medium">VERSION {APP_VERSION}</p>
+          </div>
         </aside>
 
         {/* Main Content */}
@@ -458,6 +467,12 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
     }
   };
 
+  const handleAppRefresh = () => {
+    if (window.confirm('将重新加载应用以检查更新。未保存的输入可能会丢失，确定吗？')) {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto pb-40">
       <header className="mb-8">
@@ -510,59 +525,91 @@ const Trends: React.FC<{ records: WealthRecord[], setRecords: React.Dispatch<Rea
           })}
         </div>
 
-        {/* Data Management Section */}
-        <div className="space-y-4">
-          <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
-            <Settings size={18} />
-            数据管理
-          </h4>
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              提示：您的数据目前仅存储在此设备本地浏览器中。建议定期导出备份。
-            </p>
-            
-            <button 
-              onClick={handleExport}
-              className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Download size={20} className="text-indigo-500" />
-                <div className="text-left">
-                  <span className="font-bold block text-sm">备份数据</span>
-                  <span className="text-[10px] text-slate-400">导出为 .json 文件</span>
+        {/* Data & App Management */}
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
+              <Settings size={18} />
+              数据管理
+            </h4>
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                提示：您的数据目前仅存储在此设备本地浏览器中。
+              </p>
+              
+              <button 
+                onClick={handleExport}
+                className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <Download size={20} className="text-indigo-500" />
+                  <div className="text-left">
+                    <span className="font-bold block text-sm">备份数据</span>
+                    <span className="text-[10px] text-slate-400">导出为 .json 文件</span>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-300" />
+              </button>
+
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <Upload size={20} className="text-emerald-500" />
+                  <div className="text-left">
+                    <span className="font-bold block text-sm">还原数据</span>
+                    <span className="text-[10px] text-slate-400">从备份文件导入</span>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-300" />
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImport} 
+                accept=".json" 
+                className="hidden" 
+              />
+
+              <button 
+                onClick={handleClearAll}
+                className="w-full flex items-center gap-3 p-4 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <AlertTriangle size={20} />
+                <span className="font-bold text-sm">清空所有本地数据</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-bold flex items-center gap-2 px-1 text-slate-700">
+              <Cpu size={18} />
+              系统信息
+            </h4>
+            <div className="bg-slate-900 p-6 rounded-3xl text-slate-300 shadow-xl">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">Current Version</p>
+                  <p className="text-xl font-mono font-bold text-white tracking-tighter">{APP_VERSION}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">Build Date</p>
+                  <p className="text-sm font-mono text-slate-400">{BUILD_DATE}</p>
                 </div>
               </div>
-              <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-300" />
-            </button>
 
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Upload size={20} className="text-emerald-500" />
-                <div className="text-left">
-                  <span className="font-bold block text-sm">还原数据</span>
-                  <span className="text-[10px] text-slate-400">从备份文件导入</span>
-                </div>
-              </div>
-              <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-300" />
-            </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleImport} 
-              accept=".json" 
-              className="hidden" 
-            />
-
-            <button 
-              onClick={handleClearAll}
-              className="w-full flex items-center gap-3 p-4 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-            >
-              <AlertTriangle size={20} />
-              <span className="font-bold text-sm">清空所有本地数据</span>
-            </button>
+              <button 
+                onClick={handleAppRefresh}
+                className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95"
+              >
+                <RefreshCw size={18} />
+                <span className="font-bold text-sm">检查应用更新</span>
+              </button>
+              <p className="text-[10px] text-slate-500 mt-4 text-center leading-relaxed">
+                如果您刚在 Vercel 部署了新代码，请点击上方按钮强制刷新缓存。
+              </p>
+            </div>
           </div>
         </div>
       </div>
